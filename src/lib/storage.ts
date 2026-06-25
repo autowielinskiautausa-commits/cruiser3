@@ -4,6 +4,21 @@ const BUCKET = "car-media";
 
 const cache = new Map<string, { url: string; exp: number }>();
 
+// Uploads an image to Cloudflare R2 via the "upload-to-r2" edge function.
+// Returns the public R2 URL, which is stored directly in the database and used
+// as an <img src> across the site (no Supabase Storage / signed URLs needed).
+export async function uploadCarImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("filename", file.name);
+  const { data, error } = await supabase.functions.invoke<{ url: string }>("upload-to-r2", {
+    body: form,
+  });
+  if (error) throw error;
+  if (!data?.url) throw new Error("Brak adresu URL w odpowiedzi serwera");
+  return data.url;
+}
+
 export async function getSignedUrl(path: string, expiresIn = 3600): Promise<string> {
   if (!path) return "";
   if (path.startsWith("http")) return path;

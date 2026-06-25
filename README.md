@@ -1,56 +1,62 @@
-# Auto-Wieliński — Vite + React SPA
+# Auto-Wieliński — static SPA (Vite + React)
 
-Static single-page app converted from TanStack Start (SSR) to a plain
-**Vite + React** SPA. Uses TanStack Router for client-side routing and the
-Supabase JS client for all data, auth, and the admin panel — entirely in the
-browser. No SSR, no server functions, no `dist/server`.
+A static single-page app (no SSR). Front-end talks directly to Supabase, and
+privileged work (image upload, user management) runs in Supabase Edge Functions.
+Deployable to Cloudflare Pages or any static host.
 
-## Setup
-
-1. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-2. Create `.env` (copy `.env.example`) with your own Supabase project:
-
-   ```
-   VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-   VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_OR_ANON_KEY
-   ```
-
-3. Run locally:
-
-   ```bash
-   npm run dev
-   ```
-
-## Build
+## 1. Local setup
 
 ```bash
-npm run build
+npm install
+cp .env.example .env   # then fill in your Supabase values
+npm run dev            # http://localhost:8080
+npm run build          # outputs to dist/
 ```
 
-Produces a `dist/` folder containing `index.html`, hashed assets, and
-`_redirects`. There is **no** `dist/server` folder.
+## 2. Environment variables
 
-## Deploy to Cloudflare Pages
+Set these in `.env` for local dev and in your host's build settings:
+
+- `VITE_SUPABASE_URL` — your project URL (`https://<ref>.supabase.co`)
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — anon / publishable key
+- `VITE_SUPABASE_PROJECT_ID` — project ref (optional)
+
+These are public client keys — safe to expose. Never put the service-role key here.
+
+## 3. Database
+
+Run `database-setup.sql` (provided separately) in your Supabase SQL Editor.
+It creates the `profiles`, `user_roles`, `cars` tables, RLS policies, grants,
+the `car-media` storage bucket, and the first-admin bootstrap trigger.
+Then enable **Email** auth (Authentication → Providers) so the first admin can
+register at `/admin`.
+
+## 4. Edge Functions
+
+Deploy both functions and set their secrets:
+
+```bash
+supabase functions deploy upload-to-r2
+supabase functions deploy manage-users
+```
+
+`upload-to-r2` secrets: `R2_ACCOUNT_ID`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`,
+`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (plus auto-provided
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+
+`manage-users` uses auto-provided `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` — no extra secrets needed.
+
+## 5. Deploy to Cloudflare Pages
 
 - Build command: `npm run build`
 - Build output directory: `dist`
-- `public/_redirects` (`/* /index.html 200`) is copied into `dist/` and
-  enables SPA deep-link routing on Cloudflare Pages.
-- Add the two `VITE_SUPABASE_*` variables as Pages environment variables.
+- Add the `VITE_*` environment variables in the Pages project settings.
 
-## Notes / differences from the original
+`public/_redirects` provides the SPA fallback so deep links / refreshes work.
 
-- **In-app user management was removed.** Creating/deleting other admin users
-  required the Supabase service-role key, which must never ship in a browser
-  SPA. Add new admins/editors directly in your Supabase dashboard (Auth +
-  the `user_roles` table). The first signed-up user becomes admin via the
-  `handle_new_user` trigger.
-- All Supabase access uses the publishable/anon key and is protected by your
-  RLS policies. Make sure RLS + the `has_role` function + `user_roles` table
-  exist in your project (see your existing schema).
-- Admin login lives at `/admin` (no public link), dashboard at `/dashboard`.
+## 6. First admin
+
+Visit `/admin`. If no admin exists yet, a one-time registration option appears.
+Create the first account — it automatically becomes the admin. The option then
+disappears. Manage further accounts from the dashboard "Użytkownicy" tab.

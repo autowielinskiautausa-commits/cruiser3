@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { CarImage } from "@/components/car-image";
-import { uploadCarMedia, removeCarMedia } from "@/lib/storage";
+import { uploadCarMedia, removeCarMedia, uploadCarImage } from "@/lib/storage";
 import { toast } from "sonner";
 import { X, Upload, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -70,7 +70,7 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
           toast.error(`${f.name} jest zbyt duży (max 20MB)`);
           continue;
         }
-        paths.push(await uploadCarMedia(f));
+        paths.push(await uploadCarImage(f));
       }
       set("images", [...v.images, ...paths]);
     } catch (e) {

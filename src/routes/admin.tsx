@@ -10,7 +10,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminLogin,
 });
 
-type Mode = "signin" | "forgot";
+type Mode = "signin" | "forgot" | "register";
 
 function AdminLogin() {
   const navigate = useNavigate();
@@ -20,13 +20,47 @@ function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  // null = unknown/loading, true/false once checked
+  const [adminExists, setAdminExists] = useState<boolean | null>(null);
 
   useEffect(() => {
     setMounted(true);
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/dashboard" });
     });
+    // Check whether an admin account already exists (portable DB function).
+    supabase.rpc("admin_exists").then(({ data, error }) => {
+      if (error) {
+        console.error("Nie udało się sprawdzić istnienia administratora", error);
+        // Fail safe: assume an admin exists so we don't expose registration.
+        setAdminExists(true);
+        return;
+      }
+      setAdminExists(Boolean(data));
+    });
   }, [navigate]);
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+    });
+    setLoading(false);
+    if (error) return toast.error("Błąd rejestracji", { description: error.message });
+    if (data.session) {
+      toast.success("Konto administratora utworzone");
+      navigate({ to: "/dashboard" });
+    } else {
+      toast.success("Konto utworzone", {
+        description: "Potwierdź adres e-mail, a następnie zaloguj się.",
+      });
+      setAdminExists(true);
+      setMode("signin");
+    }
+  }
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -78,6 +112,44 @@ function AdminLogin() {
               className="mt-4 w-full text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
             >
               Nie pamiętasz hasła?
+            </button>
+            {adminExists === false && (
+              <button
+                type="button"
+                onClick={() => setMode("register")}
+                className="mt-2 w-full text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              >
+                Brak konta administratora — utwórz pierwsze konto
+              </button>
+            )}
+          </>
+        )}
+
+        {mode === "register" && (
+          <>
+            <h1 className="text-xl font-semibold mb-2 text-center">Utwórz konto administratora</h1>
+            <p className="text-sm text-muted-foreground mb-6 text-center">
+              To jednorazowa rejestracja pierwszego administratora. Po jej utworzeniu opcja zniknie.
+            </p>
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+              </div>
+              <div>
+                <Label htmlFor="password">Hasło</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Tworzenie..." : "Utwórz konto"}
+              </Button>
+            </form>
+            <button
+              type="button"
+              onClick={() => setMode("signin")}
+              className="mt-4 w-full text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            >
+              Wróć do logowania
             </button>
           </>
         )}

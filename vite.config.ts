@@ -4,8 +4,6 @@ import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
-// Standard Vite + React SPA.
-// TanStack Router is used for client-side routing only (no SSR / no server functions).
 export default defineConfig({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
@@ -14,11 +12,7 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   server: {
-    host: "::",
+    host: true,
     port: 8080,
-  },
-  build: {
-    // Outputs a static SPA into dist/ (index.html + assets). No dist/server.
-    outDir: "dist",
   },
 });
