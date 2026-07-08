@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { CarImage } from "@/components/car-image";
-import { uploadCarMedia, removeCarMedia, uploadCarImage } from "@/lib/storage";
+import { uploadCarMedia, removeCarMedia, uploadCarImage, deleteCarImages } from "@/lib/storage";
 import { toast } from "sonner";
-import { X, Upload, Loader2 } from "lucide-react";
+import { X, Upload, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FUEL_OPTIONS, TRANSMISSION_OPTIONS, isAllowedVideoInput } from "@/lib/listing";
@@ -66,8 +66,8 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
     try {
       const paths: string[] = [];
       for (const f of Array.from(files)) {
-        if (f.size > 20 * 1024 * 1024) {
-          toast.error(`${f.name} jest zbyt duży (max 20MB)`);
+        if (f.size > 25 * 1024 * 1024) {
+          toast.error(`${f.name} jest zbyt duży (max 25MB przed kompresją)`);
           continue;
         }
         paths.push(await uploadCarImage(f));
@@ -78,10 +78,24 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
     } finally { setUploading(false); }
   }
 
+
   async function removeImg(i: number) {
     const path = v.images[i];
     set("images", v.images.filter((_, idx) => idx !== i));
-    removeCarMedia(path);
+    if (path?.startsWith("http")) {
+      deleteCarImages([path]).catch((e) => console.warn("R2 delete failed", e));
+    } else {
+      removeCarMedia(path);
+    }
+  }
+
+
+  function moveImg(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= v.images.length) return;
+    const next = [...v.images];
+    [next[i], next[j]] = [next[j], next[i]];
+    set("images", next);
   }
 
   async function handleVideo(files: FileList | null) {
@@ -139,6 +153,9 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
 
       <section className="bg-card border border-border rounded-lg p-6 space-y-4">
         <h2 className="font-semibold">Zdjęcia</h2>
+        <p className="text-sm text-muted-foreground">
+          Kolejność zdjęć decyduje o wyświetlaniu w ogłoszeniu. Pierwsze zdjęcie jest zdjęciem głównym — użyj strzałek, aby zmienić kolejność.
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {v.images.map((p, i) => (
             <div key={p} className="relative aspect-square rounded-md overflow-hidden bg-muted group">
@@ -147,14 +164,26 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
                 className="absolute top-1 right-1 bg-background/90 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <X className="w-4 h-4" />
               </button>
+              <div className="absolute bottom-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button type="button" onClick={() => moveImg(i, -1)} disabled={i === 0}
+                  className="bg-background/90 rounded-full p-1 disabled:opacity-30">
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <button type="button" onClick={() => moveImg(i, 1)} disabled={i === v.images.length - 1}
+                  className="bg-background/90 rounded-full p-1 disabled:opacity-30">
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
               {i === 0 && <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">Główne</div>}
             </div>
           ))}
           <label className="aspect-square border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-accent transition-colors">
             {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6 text-muted-foreground" />}
-            <span className="text-xs text-muted-foreground mt-2">Dodaj</span>
-            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            <span className="text-xs text-muted-foreground mt-2">{uploading ? "Wgrywanie..." : "Dodaj"}</span>
+            <input type="file" accept="image/*,.heic,.heif" multiple className="hidden" disabled={uploading} onChange={(e) => handleFiles(e.target.files)} />
           </label>
+
+
         </div>
       </section>
 

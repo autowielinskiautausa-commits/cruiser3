@@ -9,7 +9,7 @@ import { formatPLN, formatMileage } from "@/lib/format";
 import { LEGAL_DISCLAIMER, resolveVideo } from "@/lib/listing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, ArrowLeft, Calendar, Gauge, Fuel, Cog, Zap, Palette } from "lucide-react";
+import { Phone, ArrowLeft, Calendar, Gauge, Fuel, Cog, Zap, Palette, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/auto/$id")({
   component: CarDetail,
@@ -68,7 +68,31 @@ function CarDetail() {
                   <Badge className="bg-destructive text-destructive-foreground text-base px-4 py-1">Sprzedane</Badge>
                 </div>
               )}
+              {car.images?.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Poprzednie zdjęcie"
+                    onClick={() => setActive((a) => (a - 1 + car.images.length) % car.images.length)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground rounded-full p-2 shadow-md transition-colors"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Następne zdjęcie"
+                    onClick={() => setActive((a) => (a + 1) % car.images.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground rounded-full p-2 shadow-md transition-colors"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                  <div className="absolute bottom-3 right-3 bg-background/80 text-foreground text-sm px-2.5 py-1 rounded-full">
+                    {active + 1} / {car.images.length}
+                  </div>
+                </>
+              )}
             </div>
+
             {car.images?.length > 1 && (
               <div className="grid grid-cols-5 gap-2">
                 {car.images.map((p, i) => (

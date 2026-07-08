@@ -65,6 +65,44 @@ export function SiteFooter() {
           </a>
         </div>
       </div>
+      <div className="container mx-auto px-4 pb-8">
+        <details className="text-xs text-muted-foreground/70">
+          <summary className="cursor-pointer select-none hover:text-muted-foreground transition-colors">
+            Informacja o przetwarzaniu danych (RODO) i plikach cookie
+          </summary>
+          <div className="mt-3 space-y-2 leading-relaxed max-w-3xl">
+            <p>
+              Zgodnie z art. 13 rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia
+              27 kwietnia 2016 r. (RODO) informujemy, że administratorem Państwa danych osobowych jest
+              Auto-Wieliński. Kontakt w sprawach dotyczących danych osobowych możliwy jest pod numerami
+              telefonów podanymi powyżej.
+            </p>
+            <p>
+              Niniejsza strona korzysta z narzędzia Google Analytics 4 w celu tworzenia anonimowych
+              statystyk odwiedzin, które pomagają nam ulepszać serwis. Dane zbierane są w formie
+              zanonimizowanej — adres IP jest anonimizowany (anonymize_ip), a informacje nie pozwalają
+              na bezpośrednią identyfikację użytkownika. Podstawą przetwarzania jest nasz prawnie
+              uzasadniony interes (art. 6 ust. 1 lit. f RODO) polegający na analizie ruchu w serwisie.
+            </p>
+            <p>
+              Google Analytics wykorzystuje pliki cookie. Mogą Państwo w każdej chwili zablokować lub
+              usunąć pliki cookie w ustawieniach swojej przeglądarki, a także zainstalować dodatek
+              blokujący Google Analytics (
+              <a
+                href="https://tools.google.com/dlpage/gaoptout"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-primary"
+              >
+                tools.google.com/dlpage/gaoptout
+              </a>
+              ). Przysługuje Państwu prawo dostępu do danych, ich sprostowania, usunięcia lub
+              ograniczenia przetwarzania oraz prawo wniesienia sprzeciwu, a także skargi do Prezesa
+              Urzędu Ochrony Danych Osobowych.
+            </p>
+          </div>
+        </details>
+      </div>
     </footer>
   );
 }

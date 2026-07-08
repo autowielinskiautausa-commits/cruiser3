@@ -1,0 +1,1 @@
+ALTER TABLE public.cars ADD COLUMN IF NOT EXISTS mileage_unit text NOT NULL DEFAULT 'km';

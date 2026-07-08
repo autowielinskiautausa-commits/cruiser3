@@ -7,6 +7,7 @@ import { formatPLN, formatMileage } from "@/lib/format";
 import { LEGAL_DISCLAIMER, FUEL_OPTIONS, TRANSMISSION_OPTIONS } from "@/lib/listing";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import heroBerny from "@/assets/hero-berny.jpg";
 
 export const Route = createFileRoute("/")({
@@ -34,6 +35,7 @@ const ALL_BRANDS = "__all_brands__";
 const ALL_FUELS = "__all_fuels__";
 const ALL_TRANSMISSIONS = "__all_transmissions__";
 const CURRENT_YEAR = new Date().getFullYear();
+const PAGE_SIZE_OPTIONS = [12, 24, 36, 48];
 
 function Index() {
   const [brand, setBrand] = useState(ALL_BRANDS);
@@ -43,6 +45,8 @@ function Index() {
   const [yearTo, setYearTo] = useState("");
   const [priceFrom, setPriceFrom] = useState("");
   const [priceTo, setPriceTo] = useState("");
+  const [pageSize, setPageSize] = useState(12);
+  const [page, setPage] = useState(1);
 
   const { data: cars = [], isLoading } = useQuery({
     queryKey: ["cars-public"],
@@ -94,6 +98,18 @@ function Index() {
     priceFrom !== "" ||
     priceTo !== "";
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize],
+  );
+
+  // Reset to first page whenever filters or page size change.
+  useEffect(() => {
+    setPage(1);
+  }, [brand, fuel, transmission, yearFrom, yearTo, priceFrom, priceTo, pageSize]);
+
   function clearFilters() {
     setBrand(ALL_BRANDS);
     setFuel(ALL_FUELS);
@@ -103,6 +119,7 @@ function Index() {
     setPriceFrom("");
     setPriceTo("");
   }
+
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -236,10 +253,24 @@ function Index() {
           )}
         </div>
 
-        <div className="flex items-baseline justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h2 className="text-2xl md:text-3xl font-bold">Aktualne oferty</h2>
-          <span className="text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "auto" : "aut"}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "auto" : "aut"}</span>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Na stronę</Label>
+              <Select value={String(pageSize)} onValueChange={(val) => setPageSize(Number(val))}>
+                <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
+
 
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -257,7 +288,7 @@ function Index() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((c) => (
+            {paginated.map((c) => (
               <Link
                 key={c.id}
                 to="/auto/$id"
@@ -293,6 +324,38 @@ function Index() {
             ))}
           </div>
         )}
+
+        {!isLoading && filtered.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-10">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Poprzednia
+            </Button>
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <Button
+                key={i}
+                variant={i + 1 === currentPage ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPage(i + 1)}
+              >
+                {i + 1}
+              </Button>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Następna
+            </Button>
+          </div>
+        )}
+
       </main>
 
       <SiteFooter />
