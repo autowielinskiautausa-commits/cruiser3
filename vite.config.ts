@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Self-hosted deploy target: Cloudflare Pages.
+  // Produces a Pages-compatible output (dist/_worker.js + static assets in dist),
+  // so the SSR worker runs on Pages and .js chunks get the correct MIME type.
+  // NOTE: inside the Lovable build/preview this override is ignored (forced to
+  // cloudflare-module), so it only affects your own Cloudflare Pages CI build.
+  nitro: { preset: "cloudflare-pages" },
 });
