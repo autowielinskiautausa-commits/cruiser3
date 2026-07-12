@@ -31,9 +31,6 @@ function uploadErrorMessage(error: unknown) {
   return err.message ?? "Błąd uploadu";
 }
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-
-
 function isRetryableR2EndpointError(error: unknown) {
   const err = error as { name?: string; Code?: string };
   return err.name === "NoSuchBucket" || err.Code === "NoSuchBucket" || err.name === "AccessDenied" || err.Code === "AccessDenied";
@@ -78,20 +75,10 @@ Deno.serve(async (req) => {
     const filename = (form.get("filename") as string | null) ?? "";
     if (!(file instanceof File)) return json({ error: "Brak pliku" }, 400);
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      return json({ error: "Plik jest zbyt duży (max 10MB). Zmniejsz zdjęcie i spróbuj ponownie." }, 400);
-    }
-
-    // The frontend always converts images to JPEG before upload. Force the
-    // stored object to be a proper JPEG regardless of the incoming content-type
-    // so R2 (and the app) can always preview it.
-    const FORCED_CONTENT_TYPE = "image/jpeg";
-
     const safeName = (filename || file.name || "plik")
       .replace(/[^a-zA-Z0-9._-]/g, "_")
-      .replace(/\.[^/.]+$/, "") // strip any extension
       .slice(-100);
-    const key = `${Date.now()}-${safeName}.jpg`; // always store as .jpg
+    const key = `${Date.now()}-${safeName}`;
 
     const accountId = requiredEnv("R2_ACCOUNT_ID");
     const bucket = requiredEnv("R2_BUCKET_NAME");
@@ -111,9 +98,8 @@ Deno.serve(async (req) => {
       Bucket: bucket,
       Key: key,
       Body: bytes,
-      ContentType: FORCED_CONTENT_TYPE,
+      ContentType: file.type || "application/octet-stream",
     });
-
 
     const endpointCandidates = [
       { label: "default", url: `https://${accountId}.r2.cloudflarestorage.com` },
@@ -138,7 +124,6 @@ Deno.serve(async (req) => {
         if (!isRetryableR2EndpointError(uploadError)) break;
       }
     }
-
 
     if (lastUploadError) throw lastUploadError;
 

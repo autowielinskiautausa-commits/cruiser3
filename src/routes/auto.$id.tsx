@@ -63,36 +63,32 @@ function CarDetail() {
           <div className="lg:col-span-2 space-y-4">
             <div className="relative aspect-[4/3] bg-muted rounded-lg overflow-hidden shadow-card">
               <CarImage path={car.images?.[active]} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
-              {car.is_sold && (
-                <div className="absolute top-4 left-4">
-                  <Badge className="bg-destructive text-destructive-foreground text-base px-4 py-1">Sprzedane</Badge>
-                </div>
-              )}
               {car.images?.length > 1 && (
                 <>
                   <button
                     type="button"
                     aria-label="Poprzednie zdjęcie"
-                    onClick={() => setActive((a) => (a - 1 + car.images.length) % car.images.length)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground rounded-full p-2 shadow-md transition-colors"
+                    onClick={() => setActive((i) => (i - 1 + car.images.length) % car.images.length)}
+                    className="absolute top-1/2 left-3 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-background/70 text-foreground backdrop-blur-sm shadow-md hover:bg-background/90 active:bg-background touch-manipulation"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
                     type="button"
                     aria-label="Następne zdjęcie"
-                    onClick={() => setActive((a) => (a + 1) % car.images.length)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background text-foreground rounded-full p-2 shadow-md transition-colors"
+                    onClick={() => setActive((i) => (i + 1) % car.images.length)}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-background/70 text-foreground backdrop-blur-sm shadow-md hover:bg-background/90 active:bg-background touch-manipulation"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
-                  <div className="absolute bottom-3 right-3 bg-background/80 text-foreground text-sm px-2.5 py-1 rounded-full">
-                    {active + 1} / {car.images.length}
-                  </div>
                 </>
               )}
+              {car.is_sold && (
+                <div className="absolute top-4 left-4 z-10">
+                  <Badge className="bg-destructive text-destructive-foreground text-base px-4 py-1">Sprzedane</Badge>
+                </div>
+              )}
             </div>
-
             {car.images?.length > 1 && (
               <div className="grid grid-cols-5 gap-2">
                 {car.images.map((p, i) => (

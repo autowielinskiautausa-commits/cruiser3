@@ -1,9 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  listUsers,
+  createUser,
+  setUserRole,
+  deleteUser,
+  type ManagedRole,
+} from "@/lib/users.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,44 +46,20 @@ export const Route = createFileRoute("/_authenticated/dashboard/users")({
   component: UsersPage,
 });
 
-type ManagedRole = "admin" | "editor" | "none";
-
-interface ManagedUser {
-  id: string;
-  email: string | null;
-  role: ManagedRole;
-  createdAt: string;
-}
-
 const roleLabel: Record<ManagedRole, string> = {
   admin: "Administrator",
   editor: "Edytor",
   none: "Brak roli",
 };
 
-// All user-management actions go through the "manage-users" edge function,
-// which uses the service-role key server-side and verifies the caller is admin.
-async function invokeManageUsers<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T>("manage-users", { body });
-  if (error) {
-    // Surface the function's JSON error message when available.
-    const ctx = (error as { context?: Response }).context;
-    if (ctx && typeof ctx.json === "function") {
-      try {
-        const payload = await ctx.json();
-        throw new Error(payload?.error ?? error.message);
-      } catch {
-        throw new Error(error.message);
-      }
-    }
-    throw new Error(error.message);
-  }
-  return data as T;
-}
-
 function UsersPage() {
   const { user, isAdmin, loading } = useAuth();
   const queryClient = useQueryClient();
+
+  const listUsersFn = useServerFn(listUsers);
+  const createUserFn = useServerFn(createUser);
+  const setUserRoleFn = useServerFn(setUserRole);
+  const deleteUserFn = useServerFn(deleteUser);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -84,15 +67,14 @@ function UsersPage() {
 
   const usersQuery = useQuery({
     queryKey: ["admin-users"],
-    queryFn: () => invokeManageUsers<{ users: ManagedUser[] }>({ action: "list" }),
+    queryFn: () => listUsersFn(),
     enabled: isAdmin,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin-users"] });
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      invokeManageUsers({ action: "create", email, password, role: newRole }),
+    mutationFn: () => createUserFn({ data: { email, password, role: newRole } }),
     onSuccess: () => {
       toast.success("Konto utworzone");
       setEmail("");
@@ -104,8 +86,7 @@ function UsersPage() {
   });
 
   const roleMutation = useMutation({
-    mutationFn: (vars: { userId: string; role: ManagedRole }) =>
-      invokeManageUsers({ action: "setRole", ...vars }),
+    mutationFn: (vars: { userId: string; role: ManagedRole }) => setUserRoleFn({ data: vars }),
     onSuccess: () => {
       toast.success("Rola zaktualizowana");
       invalidate();
@@ -114,7 +95,7 @@ function UsersPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (userId: string) => invokeManageUsers({ action: "delete", userId }),
+    mutationFn: (userId: string) => deleteUserFn({ data: { userId } }),
     onSuccess: () => {
       toast.success("Konto usunięte");
       invalidate();
@@ -205,7 +186,7 @@ function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {usersQuery.data?.users?.map((u) => {
+              {usersQuery.data?.map((u) => {
                 const isSelf = u.id === user?.id;
                 return (
                   <TableRow key={u.id}>

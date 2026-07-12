@@ -2,12 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
-import { CarImage } from "@/components/car-image";
+import { CarCarousel } from "@/components/car-carousel";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatPLN, formatMileage } from "@/lib/format";
 import { LEGAL_DISCLAIMER, FUEL_OPTIONS, TRANSMISSION_OPTIONS } from "@/lib/listing";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -35,7 +36,8 @@ const ALL_BRANDS = "__all_brands__";
 const ALL_FUELS = "__all_fuels__";
 const ALL_TRANSMISSIONS = "__all_transmissions__";
 const CURRENT_YEAR = new Date().getFullYear();
-const PAGE_SIZE_OPTIONS = [12, 24, 36, 48];
+const PER_PAGE_OPTIONS = [12, 24, 36, 48];
+const DEFAULT_PER_PAGE = 24;
 
 function Index() {
   const [brand, setBrand] = useState(ALL_BRANDS);
@@ -45,7 +47,7 @@ function Index() {
   const [yearTo, setYearTo] = useState("");
   const [priceFrom, setPriceFrom] = useState("");
   const [priceTo, setPriceTo] = useState("");
-  const [pageSize, setPageSize] = useState(12);
+  const [perPage, setPerPage] = useState(DEFAULT_PER_PAGE);
   const [page, setPage] = useState(1);
 
   const { data: cars = [], isLoading } = useQuery({
@@ -89,6 +91,18 @@ function Index() {
     });
   }, [cars, brand, fuel, transmission, yearFrom, yearTo, priceFrom, priceTo]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
+    [filtered, currentPage, perPage],
+  );
+
+  // Reset to the first page whenever filters or page size change.
+  useEffect(() => {
+    setPage(1);
+  }, [brand, fuel, transmission, yearFrom, yearTo, priceFrom, priceTo, perPage]);
+
   const hasActiveFilters =
     brand !== ALL_BRANDS ||
     fuel !== ALL_FUELS ||
@@ -97,18 +111,6 @@ function Index() {
     yearTo !== "" ||
     priceFrom !== "" ||
     priceTo !== "";
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filtered, currentPage, pageSize],
-  );
-
-  // Reset to first page whenever filters or page size change.
-  useEffect(() => {
-    setPage(1);
-  }, [brand, fuel, transmission, yearFrom, yearTo, priceFrom, priceTo, pageSize]);
 
   function clearFilters() {
     setBrand(ALL_BRANDS);
@@ -119,7 +121,6 @@ function Index() {
     setPriceFrom("");
     setPriceTo("");
   }
-
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -259,10 +260,10 @@ function Index() {
             <span className="text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "auto" : "aut"}</span>
             <div className="flex items-center gap-2">
               <Label className="text-sm whitespace-nowrap">Na stronę</Label>
-              <Select value={String(pageSize)} onValueChange={(val) => setPageSize(Number(val))}>
+              <Select value={String(perPage)} onValueChange={(val) => setPerPage(Number(val))}>
                 <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAGE_SIZE_OPTIONS.map((n) => (
+                  {PER_PAGE_OPTIONS.map((n) => (
                     <SelectItem key={n} value={String(n)}>{n}</SelectItem>
                   ))}
                 </SelectContent>
@@ -270,7 +271,6 @@ function Index() {
             </div>
           </div>
         </div>
-
 
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -296,13 +296,15 @@ function Index() {
                 className="group bg-card border border-border rounded-lg overflow-hidden shadow-card hover:shadow-elegant transition-all hover:-translate-y-1 flex flex-col"
               >
                 <div className="relative aspect-[4/3] bg-muted overflow-hidden">
-                  <CarImage
-                    path={c.images?.[0]}
+                  <CarCarousel
+                    images={c.images}
                     alt={`${c.brand} ${c.model}`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    stopNav
+                    className="w-full h-full"
+                    imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   {c.is_sold && (
-                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center pointer-events-none">
                       <Badge className="bg-destructive text-destructive-foreground text-base px-4 py-1">Sprzedane</Badge>
                     </div>
                   )}
@@ -325,38 +327,33 @@ function Index() {
           </div>
         )}
 
-        {!isLoading && filtered.length > 0 && totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-10">
+        {!isLoading && filtered.length > perPage && (
+          <div className="flex items-center justify-center gap-3 mt-10">
             <Button
               variant="outline"
-              size="sm"
-              disabled={currentPage <= 1}
+              size="icon"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              aria-label="Poprzednia strona"
             >
-              Poprzednia
+              <ChevronLeft className="w-4 h-4" />
             </Button>
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <Button
-                key={i}
-                variant={i + 1 === currentPage ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPage(i + 1)}
-              >
-                {i + 1}
-              </Button>
-            ))}
+            <span className="text-sm text-muted-foreground">
+              Strona {currentPage} z {totalPages}
+            </span>
             <Button
               variant="outline"
-              size="sm"
-              disabled={currentPage >= totalPages}
+              size="icon"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              aria-label="Następna strona"
             >
-              Następna
+              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         )}
-
       </main>
+
 
       <SiteFooter />
     </div>

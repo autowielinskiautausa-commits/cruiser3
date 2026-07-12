@@ -34,23 +34,6 @@ function createR2Client(endpoint: string, accessKeyId: string, secretAccessKey: 
   });
 }
 
-// Extract the object key (path after the public URL host) from a stored R2 URL.
-function extractKey(url: string, publicUrl: string): string | null {
-  if (typeof url !== "string" || !url) return null;
-  const trimmed = url.trim();
-  // Preferred: strip the configured public base URL.
-  if (trimmed.startsWith(publicUrl)) {
-    return decodeURIComponent(trimmed.slice(publicUrl.length).replace(/^\/+/, ""));
-  }
-  // Fallback: any absolute URL — use its pathname.
-  try {
-    const u = new URL(trimmed);
-    return decodeURIComponent(u.pathname.replace(/^\/+/, "")) || null;
-  } catch {
-    return null;
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -76,47 +59,71 @@ Deno.serve(async (req) => {
     if (roleErr || !isAdmin) return json({ error: "Brak uprawnień administratora" }, 403);
 
     // --- Parse body ---
-    const body = await req.json().catch(() => null);
-    const urls = (body as { urls?: unknown } | null)?.urls;
-    if (!Array.isArray(urls)) return json({ error: "Brak listy adresów URL" }, 400);
+    const body = (await req.json().catch(() => null)) as { urls?: unknown } | null;
+    const urls = Array.isArray(body?.urls)
+      ? (body!.urls as unknown[]).filter((u): u is string => typeof u === "string" && u.length > 0)
+      : [];
+    if (urls.length === 0) return json({ deleted: [], failed: [] });
 
-    const publicUrl = requiredEnv("R2_PUBLIC_URL").replace(/\/+$/, "");
     const accountId = requiredEnv("R2_ACCOUNT_ID");
     const bucket = requiredEnv("R2_BUCKET_NAME");
+    const publicUrl = requiredEnv("R2_PUBLIC_URL").replace(/\/+$/, "");
     const accessKeyId = requiredEnv("R2_ACCESS_KEY_ID");
     const secretAccessKey = requiredEnv("R2_SECRET_ACCESS_KEY");
-
-    const keys = urls
-      .map((u) => extractKey(String(u), publicUrl))
-      .filter((k): k is string => !!k);
 
     const endpointCandidates = [
       { label: "default", url: `https://${accountId}.r2.cloudflarestorage.com` },
       { label: "eu", url: `https://${accountId}.eu.r2.cloudflarestorage.com` },
-      { label: "fedramp", url: `https://${accountId}.fedramp.r2.cloudflarestorage.com` },
     ];
 
     const deleted: string[] = [];
     const failed: string[] = [];
 
-    for (const key of keys) {
+    for (const url of urls) {
+      // Extract object key by removing the public URL prefix.
+      let key = url;
+      if (url.startsWith(publicUrl)) {
+        key = url.slice(publicUrl.length);
+      } else {
+        // Fallback: strip any scheme+host, keep the path.
+        try {
+          key = new URL(url).pathname;
+        } catch {
+          key = url;
+        }
+      }
+      key = key.replace(/^\/+/, "");
+      if (!key) {
+        failed.push(url);
+        continue;
+      }
+
       const command = new DeleteObjectCommand({ Bucket: bucket, Key: key });
+
       let lastError: unknown;
+      let ok = false;
       for (const endpoint of endpointCandidates) {
         try {
           await createR2Client(endpoint.url, accessKeyId, secretAccessKey).send(command);
+          ok = true;
           lastError = undefined;
           break;
-        } catch (err) {
-          lastError = err;
-          if (!isRetryableR2EndpointError(err)) break;
+        } catch (deleteError) {
+          lastError = deleteError;
+          console.warn("r2 delete endpoint failed", {
+            endpoint: endpoint.label,
+            name: (deleteError as { name?: string }).name,
+            code: (deleteError as { Code?: string }).Code,
+          });
+          if (!isRetryableR2EndpointError(deleteError)) break;
         }
       }
-      if (lastError) {
-        console.warn("r2 delete failed", { key, name: (lastError as { name?: string }).name });
-        failed.push(key);
+
+      if (ok) {
+        deleted.push(url);
       } else {
-        deleted.push(key);
+        console.error("delete-from-r2 failed for url", { url, error: lastError });
+        failed.push(url);
       }
     }
 
