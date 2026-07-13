@@ -1,14 +1,14 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/hooks/use-auth";
-import { Car, Plus, Users } from "lucide-react";
+import { Car, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardLayout,
 });
 
 function DashboardLayout() {
-  const { isEditor, isAdmin, loading } = useAuth();
+  const { isEditor, loading } = useAuth();
   const location = useLocation();
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Ładowanie...</div>;
@@ -29,7 +29,6 @@ function DashboardLayout() {
   const tabs = [
     { to: "/dashboard", label: "Auta", icon: Car, exact: true },
     { to: "/dashboard/new", label: "Dodaj auto", icon: Plus },
-    ...(isAdmin ? [{ to: "/dashboard/users", label: "Użytkownicy", icon: Users }] : []),
   ];
 
   return (

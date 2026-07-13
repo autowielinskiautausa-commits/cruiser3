@@ -3,25 +3,11 @@ import {
   Outlet,
   createRootRouteWithContext,
   useRouter,
-  useRouterState,
-  HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 
-import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
-
-const GA_MEASUREMENT_ID = "G-H9Y59ZP04Y";
-
-declare global {
-  interface Window {
-    dataLayer?: unknown[];
-    gtag?: (...args: unknown[]) => void;
-  }
-}
 
 function NotFoundComponent() {
   return (
@@ -39,7 +25,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -55,44 +40,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Auto-Wieliński — sprawdzone samochody używane" },
-      { name: "description", content: "Auto-Wieliński — komis samochodowy. Sprawdzone auta używane w atrakcyjnych cenach." },
-      { property: "og:title", content: "Auto-Wieliński" },
-      { property: "og:description", content: "Sprawdzone auta używane. Naszą wizytówką są dwa berneńczyki." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700;800&display=swap" },
-    ],
-    scripts: [
-      { src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`, async: true },
-      {
-        children: `window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());\ngtag('config', '${GA_MEASUREMENT_ID}', { anonymize_ip: true, send_page_view: false });`,
-      },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: ReactNode }) {
-  return (
-    <html lang="pl">
-      <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -105,34 +56,9 @@ function RootComponent() {
     });
     return () => sub.subscription.unsubscribe();
   }, [queryClient, router]);
-
-  // GA4 page view tracking for client-side route changes (/, /auto/:id, /admin, ...)
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const search = useRouterState({ select: (s) => s.location.searchStr });
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.gtag !== "function") return;
-    window.gtag("event", "page_view", {
-      page_path: `${pathname}${search ?? ""}`,
-      page_location: window.location.href,
-      page_title: document.title,
-    });
-  }, [pathname, search]);
-
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex min-h-screen flex-col">
-        <div className="flex-1">
-          <Outlet />
-        </div>
-        <div className="rodo-note w-full py-2 px-4 text-center">
-          <p className="text-[10px] leading-tight text-muted-foreground/50">
-            Ta strona korzysta z Google Analytics 4 w celach statystycznych. Zgodnie z RODO
-            (rozporządzenie UE 2016/679) adres IP jest anonimizowany, a dane o ruchu są przetwarzane
-            przez Google LLC wyłącznie w formie zbiorczej, bez identyfikacji osób. Możesz zablokować
-            pliki cookies w ustawieniach przeglądarki.
-          </p>
-        </div>
-      </div>
+      <Outlet />
       <Toaster />
     </QueryClientProvider>
   );
