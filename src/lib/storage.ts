@@ -48,6 +48,22 @@ export async function uploadCarMedia(file: File): Promise<string> {
 }
 
 export async function removeCarMedia(path: string) {
-  if (!path || path.startsWith("http")) return;
+  if (!path) return;
+  if (path.startsWith("http")) {
+    // R2-hosted images are deleted via the delete-from-r2 edge function.
+    await deleteR2Images([path]);
+    return;
+  }
   await supabase.storage.from(BUCKET).remove([path]);
+}
+
+// Deletes one or more images from Cloudflare R2 via the "delete-from-r2" edge function.
+// Only http(s) URLs (R2 public URLs) are sent; non-URL paths are ignored here.
+export async function deleteR2Images(urls: string[]): Promise<void> {
+  const r2Urls = (urls ?? []).filter((u) => u && u.startsWith("http"));
+  if (r2Urls.length === 0) return;
+  const { error } = await supabase.functions.invoke("delete-from-r2", {
+    body: { urls: r2Urls },
+  });
+  if (error) throw error;
 }

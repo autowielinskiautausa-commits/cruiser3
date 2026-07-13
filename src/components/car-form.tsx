@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { CarImage } from "@/components/car-image";
 import { uploadCarMedia, removeCarMedia, uploadCarImage } from "@/lib/storage";
 import { toast } from "sonner";
-import { X, Upload, Loader2 } from "lucide-react";
+import { X, Upload, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FUEL_OPTIONS, TRANSMISSION_OPTIONS, isAllowedVideoInput } from "@/lib/listing";
@@ -48,6 +48,7 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
   const [mileageUnit, setMileageUnit] = useState<"km" | "mi">((initial?.mileage_unit as "km" | "mi") || "km");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -60,28 +61,95 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
 
   const set = <K extends keyof CarFormValues>(k: K, val: CarFormValues[K]) => setV((p) => ({ ...p, [k]: val }));
 
+  async function processImage(file: File): Promise<File> {
+    const name = file.name.toLowerCase();
+    const isHeic =
+      name.endsWith(".heic") ||
+      name.endsWith(".heif") ||
+      file.type.includes("heic") ||
+      file.type.includes("heif");
+    let blob: Blob;
+    if (isHeic) {
+      const heic2any = (await import("heic2any")).default;
+      blob = (await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })) as Blob;
+    } else {
+      blob = await new Promise<Blob>((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX = 1920;
+          let w = img.width,
+            h = img.height;
+          if (w > MAX) {
+            h = Math.round((h * MAX) / w);
+            w = MAX;
+          }
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(
+            (b) => {
+              URL.revokeObjectURL(url);
+              if (b) resolve(b);
+              else reject(new Error("Canvas conversion failed"));
+            },
+            "image/jpeg",
+            0.85,
+          );
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Image load failed"));
+        };
+        img.src = url;
+      });
+    }
+    const newName = file.name.replace(/\.[^.]+$/, ".jpg");
+    return new File([blob], newName, { type: "image/jpeg" });
+  }
+
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    setProcessing(true);
     setUploading(true);
     try {
       const paths: string[] = [];
       for (const f of Array.from(files)) {
-        if (f.size > 20 * 1024 * 1024) {
-          toast.error(`${f.name} jest zbyt duży (max 20MB)`);
+        if (f.size > 15 * 1024 * 1024) {
+          toast.error("Plik zbyt duży (max 15MB).");
           continue;
         }
-        paths.push(await uploadCarImage(f));
+        let processed: File;
+        try {
+          processed = await processImage(f);
+        } catch {
+          toast.error("Nie można przetworzyć zdjęcia. Spróbuj zapisać je jako JPEG i wgrać ponownie.");
+          continue;
+        }
+        paths.push(await uploadCarImage(processed));
       }
       set("images", [...v.images, ...paths]);
     } catch (e) {
       toast.error("Błąd wgrywania", { description: (e as Error).message });
-    } finally { setUploading(false); }
+    } finally {
+      setProcessing(false);
+      setUploading(false);
+    }
   }
 
   async function removeImg(i: number) {
     const path = v.images[i];
     set("images", v.images.filter((_, idx) => idx !== i));
     removeCarMedia(path);
+  }
+
+  function moveImg(from: number, to: number) {
+    if (to < 0 || to >= v.images.length) return;
+    const next = [...v.images];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    set("images", next);
   }
 
   async function handleVideo(files: FileList | null) {
@@ -138,22 +206,49 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
       <h1 className="font-display text-3xl font-bold">{id ? "Edytuj ogłoszenie" : "Nowe ogłoszenie"}</h1>
 
       <section className="bg-card border border-border rounded-lg p-6 space-y-4">
-        <h2 className="font-semibold">Zdjęcia</h2>
+        <div>
+          <h2 className="font-semibold">Zdjęcia</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Pierwsze zdjęcie jest głównym i wyświetla się na kafelku. Użyj strzałek, aby zmienić kolejność.
+          </p>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {v.images.map((p, i) => (
-            <div key={p} className="relative aspect-square rounded-md overflow-hidden bg-muted group">
+            <div key={p} className="relative aspect-square rounded-md overflow-hidden bg-muted border border-border">
               <CarImage path={p} alt="" className="w-full h-full object-cover" />
-              <button type="button" onClick={() => removeImg(i)}
-                className="absolute top-1 right-1 bg-background/90 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button type="button" onClick={() => removeImg(i)} aria-label="Usuń zdjęcie"
+                className="absolute top-1 right-1 bg-background/90 rounded-full p-1.5 shadow touch-manipulation">
                 <X className="w-4 h-4" />
               </button>
-              {i === 0 && <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">Główne</div>}
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 p-1 bg-gradient-to-t from-background/80 to-transparent">
+                <button
+                  type="button"
+                  onClick={() => moveImg(i, i - 1)}
+                  disabled={i === 0}
+                  aria-label="Przesuń w lewo"
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-background/90 shadow disabled:opacity-30 touch-manipulation"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {i === 0 && (
+                  <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">Główne</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => moveImg(i, i + 1)}
+                  disabled={i === v.images.length - 1}
+                  aria-label="Przesuń w prawo"
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-background/90 shadow disabled:opacity-30 touch-manipulation"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
           <label className="aspect-square border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-accent transition-colors">
             {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6 text-muted-foreground" />}
-            <span className="text-xs text-muted-foreground mt-2">Dodaj</span>
-            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            <span className="text-xs text-muted-foreground mt-2">{processing ? "Przetwarzanie zdjęć..." : "Dodaj"}</span>
+            <input type="file" accept="image/*,.heic,.heif" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           </label>
         </div>
       </section>

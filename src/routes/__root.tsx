@@ -3,6 +3,7 @@ import {
   Outlet,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -12,6 +13,15 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+
+const GA_MEASUREMENT_ID = "G-H9Y59ZP04Y";
+
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 function NotFoundComponent() {
   return (
@@ -62,6 +72,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700;800&display=swap" },
     ],
+    scripts: [
+      { src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`, async: true },
+      {
+        children: `window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());\ngtag('config', '${GA_MEASUREMENT_ID}', { anonymize_ip: true, send_page_view: false });`,
+      },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -89,9 +105,34 @@ function RootComponent() {
     });
     return () => sub.subscription.unsubscribe();
   }, [queryClient, router]);
+
+  // GA4 page view tracking for client-side route changes (/, /auto/:id, /admin, ...)
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const search = useRouterState({ select: (s) => s.location.searchStr });
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+    window.gtag("event", "page_view", {
+      page_path: `${pathname}${search ?? ""}`,
+      page_location: window.location.href,
+      page_title: document.title,
+    });
+  }, [pathname, search]);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <div className="flex min-h-screen flex-col">
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <div className="rodo-note w-full py-2 px-4 text-center">
+          <p className="text-[10px] leading-tight text-muted-foreground/50">
+            Ta strona korzysta z Google Analytics 4 w celach statystycznych. Zgodnie z RODO
+            (rozporządzenie UE 2016/679) adres IP jest anonimizowany, a dane o ruchu są przetwarzane
+            przez Google LLC wyłącznie w formie zbiorczej, bez identyfikacji osób. Możesz zablokować
+            pliki cookies w ustawieniach przeglądarki.
+          </p>
+        </div>
+      </div>
       <Toaster />
     </QueryClientProvider>
   );
