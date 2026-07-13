@@ -48,7 +48,6 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
   const [mileageUnit, setMileageUnit] = useState<"km" | "mi">((initial?.mileage_unit as "km" | "mi") || "km");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -61,81 +60,22 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
 
   const set = <K extends keyof CarFormValues>(k: K, val: CarFormValues[K]) => setV((p) => ({ ...p, [k]: val }));
 
-  async function processImage(file: File): Promise<File> {
-    const name = file.name.toLowerCase();
-    const isHeic =
-      name.endsWith(".heic") ||
-      name.endsWith(".heif") ||
-      file.type.includes("heic") ||
-      file.type.includes("heif");
-    let blob: Blob;
-    if (isHeic) {
-      const heic2any = (await import("heic2any")).default;
-      blob = (await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })) as Blob;
-    } else {
-      blob = await new Promise<Blob>((resolve, reject) => {
-        const img = new Image();
-        const url = URL.createObjectURL(file);
-        img.onload = () => {
-          const canvas = document.createElement("canvas");
-          const MAX = 1920;
-          let w = img.width,
-            h = img.height;
-          if (w > MAX) {
-            h = Math.round((h * MAX) / w);
-            w = MAX;
-          }
-          canvas.width = w;
-          canvas.height = h;
-          canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
-          canvas.toBlob(
-            (b) => {
-              URL.revokeObjectURL(url);
-              if (b) resolve(b);
-              else reject(new Error("Canvas conversion failed"));
-            },
-            "image/jpeg",
-            0.85,
-          );
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error("Image load failed"));
-        };
-        img.src = url;
-      });
-    }
-    const newName = file.name.replace(/\.[^.]+$/, ".jpg");
-    return new File([blob], newName, { type: "image/jpeg" });
-  }
-
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    setProcessing(true);
     setUploading(true);
     try {
       const paths: string[] = [];
       for (const f of Array.from(files)) {
-        if (f.size > 15 * 1024 * 1024) {
-          toast.error("Plik zbyt duży (max 15MB).");
+        if (f.size > 20 * 1024 * 1024) {
+          toast.error(`${f.name} jest zbyt duży (max 20MB)`);
           continue;
         }
-        let processed: File;
-        try {
-          processed = await processImage(f);
-        } catch {
-          toast.error("Nie można przetworzyć zdjęcia. Spróbuj zapisać je jako JPEG i wgrać ponownie.");
-          continue;
-        }
-        paths.push(await uploadCarImage(processed));
+        paths.push(await uploadCarImage(f));
       }
       set("images", [...v.images, ...paths]);
     } catch (e) {
       toast.error("Błąd wgrywania", { description: (e as Error).message });
-    } finally {
-      setProcessing(false);
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   }
 
   async function removeImg(i: number) {
@@ -247,8 +187,8 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
           ))}
           <label className="aspect-square border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-accent transition-colors">
             {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6 text-muted-foreground" />}
-            <span className="text-xs text-muted-foreground mt-2">{processing ? "Przetwarzanie zdjęć..." : "Dodaj"}</span>
-            <input type="file" accept="image/*,.heic,.heif" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            <span className="text-xs text-muted-foreground mt-2">Dodaj</span>
+            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           </label>
         </div>
       </section>
