@@ -8,7 +8,7 @@ import { formatPLN, formatMileage } from "@/lib/format";
 import { Pencil, Trash2, ExternalLink } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
-import { removeCarMedia, deleteR2Images } from "@/lib/storage";
+import { removeCarMedia } from "@/lib/storage";
 
 export const Route = createFileRoute("/_authenticated/dashboard/")({
   component: AdminList,
@@ -28,16 +28,9 @@ function AdminList() {
 
   async function handleDelete(id: string, images: string[]) {
     if (!confirm("Na pewno usunąć to ogłoszenie?")) return;
-    // Remove all R2-hosted images BEFORE deleting the listing from the database.
-    try {
-      await deleteR2Images(images ?? []);
-    } catch (e) {
-      return toast.error("Nie udało się usunąć zdjęć", { description: (e as Error).message });
-    }
-    // Also remove any legacy Supabase-storage media paths.
-    await Promise.all((images ?? []).filter((p) => p && !p.startsWith("http")).map((p) => removeCarMedia(p)));
     const { error } = await supabase.from("cars").delete().eq("id", id);
     if (error) return toast.error("Nie udało się usunąć", { description: error.message });
+    await Promise.all((images ?? []).map((p) => removeCarMedia(p)));
     toast.success("Usunięto ogłoszenie");
     qc.invalidateQueries({ queryKey: ["admin-cars"] });
     qc.invalidateQueries({ queryKey: ["cars-public"] });
