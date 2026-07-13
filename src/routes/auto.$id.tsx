@@ -9,7 +9,7 @@ import { formatPLN, formatMileage } from "@/lib/format";
 import { LEGAL_DISCLAIMER, resolveVideo } from "@/lib/listing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, ArrowLeft, Calendar, Gauge, Fuel, Cog, Zap, Palette, ChevronLeft, ChevronRight } from "lucide-react";
+import { Phone, ArrowLeft, Calendar, Gauge, Fuel, Cog, Zap, Palette } from "lucide-react";
 
 export const Route = createFileRoute("/auto/$id")({
   component: CarDetail,
@@ -63,28 +63,8 @@ function CarDetail() {
           <div className="lg:col-span-2 space-y-4">
             <div className="relative aspect-[4/3] bg-muted rounded-lg overflow-hidden shadow-card">
               <CarImage path={car.images?.[active]} alt={`${car.brand} ${car.model}`} className="w-full h-full object-cover" />
-              {car.images?.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Poprzednie zdjęcie"
-                    onClick={() => setActive((i) => (i - 1 + car.images.length) % car.images.length)}
-                    className="absolute top-1/2 left-3 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-background/70 text-foreground backdrop-blur-sm shadow-md hover:bg-background/90 active:bg-background touch-manipulation"
-                  >
-                    <ChevronLeft className="w-6 h-6" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Następne zdjęcie"
-                    onClick={() => setActive((i) => (i + 1) % car.images.length)}
-                    className="absolute top-1/2 right-3 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-background/70 text-foreground backdrop-blur-sm shadow-md hover:bg-background/90 active:bg-background touch-manipulation"
-                  >
-                    <ChevronRight className="w-6 h-6" />
-                  </button>
-                </>
-              )}
               {car.is_sold && (
-                <div className="absolute top-4 left-4 z-10">
+                <div className="absolute top-4 left-4">
                   <Badge className="bg-destructive text-destructive-foreground text-base px-4 py-1">Sprzedane</Badge>
                 </div>
               )}

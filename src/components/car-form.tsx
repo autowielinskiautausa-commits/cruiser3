@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { CarImage } from "@/components/car-image";
 import { uploadCarMedia, removeCarMedia, uploadCarImage } from "@/lib/storage";
 import { toast } from "sonner";
-import { X, Upload, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Upload, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FUEL_OPTIONS, TRANSMISSION_OPTIONS, isAllowedVideoInput } from "@/lib/listing";
@@ -84,14 +84,6 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
     removeCarMedia(path);
   }
 
-  function moveImg(from: number, to: number) {
-    if (to < 0 || to >= v.images.length) return;
-    const next = [...v.images];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    set("images", next);
-  }
-
   async function handleVideo(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
@@ -146,43 +138,16 @@ export function CarForm({ id, initial }: { id?: string; initial?: Partial<CarFor
       <h1 className="font-display text-3xl font-bold">{id ? "Edytuj ogłoszenie" : "Nowe ogłoszenie"}</h1>
 
       <section className="bg-card border border-border rounded-lg p-6 space-y-4">
-        <div>
-          <h2 className="font-semibold">Zdjęcia</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Pierwsze zdjęcie jest głównym i wyświetla się na kafelku. Użyj strzałek, aby zmienić kolejność.
-          </p>
-        </div>
+        <h2 className="font-semibold">Zdjęcia</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {v.images.map((p, i) => (
-            <div key={p} className="relative aspect-square rounded-md overflow-hidden bg-muted border border-border">
+            <div key={p} className="relative aspect-square rounded-md overflow-hidden bg-muted group">
               <CarImage path={p} alt="" className="w-full h-full object-cover" />
-              <button type="button" onClick={() => removeImg(i)} aria-label="Usuń zdjęcie"
-                className="absolute top-1 right-1 bg-background/90 rounded-full p-1.5 shadow touch-manipulation">
+              <button type="button" onClick={() => removeImg(i)}
+                className="absolute top-1 right-1 bg-background/90 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <X className="w-4 h-4" />
               </button>
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 p-1 bg-gradient-to-t from-background/80 to-transparent">
-                <button
-                  type="button"
-                  onClick={() => moveImg(i, i - 1)}
-                  disabled={i === 0}
-                  aria-label="Przesuń w lewo"
-                  className="flex items-center justify-center w-8 h-8 rounded-full bg-background/90 shadow disabled:opacity-30 touch-manipulation"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {i === 0 && (
-                  <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">Główne</span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => moveImg(i, i + 1)}
-                  disabled={i === v.images.length - 1}
-                  aria-label="Przesuń w prawo"
-                  className="flex items-center justify-center w-8 h-8 rounded-full bg-background/90 shadow disabled:opacity-30 touch-manipulation"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              {i === 0 && <div className="absolute bottom-1 left-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">Główne</div>}
             </div>
           ))}
           <label className="aspect-square border-2 border-dashed border-border rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-accent transition-colors">
